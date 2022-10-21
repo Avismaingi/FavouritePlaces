@@ -8,6 +8,7 @@ import androidx.fragment.app.FragmentActivity;
 import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
@@ -29,6 +30,7 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.example.favouriteplaces.databinding.ActivityMapsBinding;
 
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -39,7 +41,7 @@ import static com.example.favouriteplaces.MainActivity.arrayAdapter;
 import static com.example.favouriteplaces.MainActivity.locations;
 import static com.example.favouriteplaces.MainActivity.totalPlaces;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleMap.OnMapLongClickListener {
 
     private GoogleMap mMap;
     private ActivityMapsBinding binding;
@@ -91,40 +93,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         mMap.clear();
         // Long press
-        mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener() {
-            @Override
-            public void onMapLongClick(@NonNull LatLng latLng) {
-                Geocoder geocoder = new Geocoder(getApplicationContext(), Locale.getDefault()); // Locale is for different countries
-                try {
-                    String address = "";
-                    List<Address> listAddresses = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1);
-                    if (listAddresses != null && listAddresses.size() > 0) {
-                        if (listAddresses.get(0).getSubThoroughfare() != null) {
-                            address += listAddresses.get(0).getSubThoroughfare() + ", ";
-                        }
-                        if (listAddresses.get(0).getLocality() != null) {
-                            address += listAddresses.get(0).getLocality();
-                        }
-//                        Log.i("PlaceInfo", address);
-                    }
-                    if(!address.equals("")){
-                        mMap.addMarker(new MarkerOptions().position(latLng).title(address));
-                        totalPlaces.add(address);
-                    }
-                    else{
-                        SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.getDefault());
-                        String currentDateandTime = sdf.format(new Date());
-                        mMap.addMarker(new MarkerOptions().position(latLng).title(currentDateandTime));
-                        totalPlaces.add(currentDateandTime);
-                    }
-                    locations.add(latLng);
-                    Toast.makeText(MapsActivity.this, "Location added!!", Toast.LENGTH_SHORT).show();
-                    arrayAdapter.notifyDataSetChanged();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        });
+        mMap.setOnMapLongClickListener(this);
 
 
         // Get intent here not in onCreate to make sure the map is ready
@@ -165,6 +134,58 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             placeLocation.setLatitude(locations.get(placeId).latitude);
             placeLocation.setLongitude(locations.get(placeId).longitude);
             centerMapOnLocation(placeLocation, "Your saved location!");
+        }
+    }
+
+    @Override
+    public void onMapLongClick(@NonNull LatLng latLng) {
+        Geocoder geocoder = new Geocoder(getApplicationContext(), Locale.getDefault()); // Locale is for different countries
+        try {
+            String address = "";
+            List<Address> listAddresses = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1);
+            if (listAddresses != null && listAddresses.size() > 0) {
+                if (listAddresses.get(0).getSubThoroughfare() != null) {
+                    address += listAddresses.get(0).getSubThoroughfare() + ", ";
+                }
+                if (listAddresses.get(0).getLocality() != null) {
+                    address += listAddresses.get(0).getLocality();
+                }
+//                        Log.i("PlaceInfo", address);
+            }
+            if(!address.equals("")){
+                mMap.addMarker(new MarkerOptions().position(latLng).title(address));
+                totalPlaces.add(address);
+            }
+            else{
+                SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.getDefault());
+                String currentDateandTime = sdf.format(new Date());
+                mMap.addMarker(new MarkerOptions().position(latLng).title(currentDateandTime));
+                totalPlaces.add(currentDateandTime);
+            }
+            locations.add(latLng);
+
+            SharedPreferences sharedPreferences = this.getSharedPreferences("com.example.favouriteplaces", Context.MODE_PRIVATE);
+
+            try {
+                sharedPreferences.edit().putString("places",ObjectSerializer.serialize(totalPlaces)).apply();
+                ArrayList<String> latitudes=new ArrayList<>();
+                ArrayList<String> longitudes=new ArrayList<>();
+
+                for(LatLng coord:locations){
+                    latitudes.add(String.valueOf(coord.latitude));
+                    longitudes.add(String.valueOf(coord.longitude));
+                }
+
+                sharedPreferences.edit().putString("lats",ObjectSerializer.serialize(latitudes)).apply();
+                sharedPreferences.edit().putString("longs",ObjectSerializer.serialize(longitudes)).apply();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            Toast.makeText(MapsActivity.this, "Location added!!", Toast.LENGTH_SHORT).show();
+            arrayAdapter.notifyDataSetChanged();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }
